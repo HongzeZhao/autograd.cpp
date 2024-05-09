@@ -5,9 +5,13 @@
 using namespace std;
 
 int main() {
-    int *a = new int[64];
+    autograd::Shape shape = autograd::make_shape(6, 4);
+    cout << "dim:" << shape.dim() << endl;
+    for (int i = 0; i < shape.dim(); i++) {
+        cout << shape[i] << endl;
+    }
 
-    autograd::Tensor<int> t(a);
+    autograd::Tensorf t(shape);
 
-    cout << t.get(0) << endl;
+    cout << "t=" << t << endl;
 }
