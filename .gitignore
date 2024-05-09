@@ -36,6 +36,8 @@
 *.lock
 bazel-*
 
+.cache
+
 # cmake
 CMakeCache.txt
 CMakeFiles
