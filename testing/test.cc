@@ -33,16 +33,30 @@ int main() {
         {4, 5}},
         {{0, 1},
         {2, 3},
+        {4, 5}},
+        {{0, 1},
+        {2, 3},
         {4, 5}}
     };
     cout << "a = " << a << endl;
 
     autograd::Tensorf b = {
         {{2, 2}, {1, 2}},
+        {{3, 1}, {4, 1}},
         {{3, 1}, {4, 1}}
     };
     cout << "b = " << b << endl;
 
     cout << "a x b = " << a.matmul(b, false) << endl;
     cout << "a x a^t = " << a.matmul(a, true) << endl;
+
+    //cout << "a.shape() = " << a.shape() << endl;
+    cout << "a = " << a << endl;
+    cout << "a.transpose() = " << a.transpose() << endl;
+    cout << "a.transpose(0,2,1) = " << a.transpose({0, 2, 1}) << endl;
+
+
+    autograd::Tensorf x = {{1, 2}, {3, 4}};
+    cout << "x = " << x << endl;
+    cout << "x.transpose() = " << x.transpose() << endl;
 }

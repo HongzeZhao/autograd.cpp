@@ -2,6 +2,9 @@
 #include <ostream>
 #include <random>
 #include <cmath>
+#include <type_traits>
+#include <vector>
+#include <iostream>
 #include "shape.hpp"
 #include "allocator.hpp"
 
@@ -10,16 +13,48 @@ namespace autograd {
     template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
     class Tensor {
     public:
-        explicit Tensor(Shape shape): _shape(shape) {
+        explicit Tensor(Shape shape): _shape(shape), _view(false) {
             this->_data = AllocatorType::alloc(_shape.numel());
         }
 
+        Tensor(const Tensor &rhs): _view(rhs._view) {
+            if (_view) {
+                this->_data = rhs._data;
+            } else {
+                *this->_data = *rhs._data;
+            }
+            this->_shape = rhs._shape;
+        }
+
+        Tensor(Tensor &&rhs): _view(rhs._view), _data(rhs._data), _shape(std::move(rhs._shape)) {
+            rhs._view = true;
+        }
+
+        Tensor & operator=(const Tensor &rhs) {
+            this->_view = rhs._view;
+            if (_view) {
+                this->_data = rhs._data;
+            } else {
+                *this->_data = *rhs._data;
+            }
+            this->_shape = rhs._shape;
+            return *this;
+        }
+
+        Tensor & operator=(const Tensor &&rhs) {
+            this->_view = rhs._view;
+            this->_data = rhs._data;
+            this->_shape = std::move(rhs._shape);
+            rhs._view = true;
+            return *this;
+        }
+
         // shallow copy
-        Tensor(ValueType *data, Shape shape): _shape(shape) {
+        Tensor(ValueType *data, Shape shape): _shape(shape), _view(true) {
             this->_data = data;
         }
 
-        Tensor(const std::initializer_list<ValueType>& init_list) {
+        Tensor(const std::initializer_list<ValueType>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             this->_data = AllocatorType::alloc(_shape.numel());
             ValueType *p = this->_data;
@@ -28,7 +63,7 @@ namespace autograd {
             }
         }
 
-        Tensor(const std::initializer_list<std::initializer_list<ValueType>>& init_list) {
+        Tensor(const std::initializer_list<std::initializer_list<ValueType>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
                 _shape.push_back(init_list.begin()->size());
@@ -40,7 +75,7 @@ namespace autograd {
             }
         }
 
-        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>& init_list) {
+        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
                 _shape.push_back(init_list.begin()->size());
@@ -57,7 +92,7 @@ namespace autograd {
             }
         }
 
-        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>>& init_list) {
+        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
                 _shape.push_back(init_list.begin()->size());
@@ -75,6 +110,15 @@ namespace autograd {
                     for (const auto &illl : ill) {
                         for (ValueType v : illl) (*p++) = v;
                     }
+                }
+            }
+        }
+
+        ~Tensor() {
+            if (!_view) {
+                if (_data != nullptr) {
+                    AllocatorType::free(_data);
+                    _data = nullptr;
                 }
             }
         }
@@ -339,6 +383,45 @@ namespace autograd {
             }
         }
 
+
+        /**
+        * Permutes the dimensions according to the value of perm.
+        * The returned tensor's dimension i will correspond to the input dimension perm[i].
+        * If perm is not given, it is set to (n-1...0), where n is the rank of the input tensor.
+        * Hence, by default, this operation performs a regular matrix transpose on 2-D input Tensors.
+        */
+        Tensor transpose(Shape perm={}) const {
+            if (_shape.dim() <= 1) return *this;
+
+            int dim = _shape.dim();
+            if (perm.dim() == 0) {
+                for (int i = dim - 1; i >= 0; i--) perm.push_back(i);
+            }
+            assert(perm.dim() == _shape.dim());
+
+            Shape shape;
+            for (auto d : perm) shape.push_back(_shape[d]);
+            
+            Tensor ret(shape);
+
+            int n = _shape.numel();
+            std::vector<int> idx(dim);
+            for (int i = 0; i < n; i++) {
+                int k = i;
+                for (int d = dim - 1; d >= 0; d--) {
+                    idx[perm[d]] = k % _shape[d];
+                    k /= _shape[d];
+                }
+                
+                int t = idx[0];
+                for (int d = 1; d < dim; d++) {
+                    t = t * shape[d] + idx[d];
+                }
+                ret._data[t] = this->_data[i];
+            }
+            return ret;
+        }
+
     private:
         // M(axb) x M(bxc) = M(axc)
         void _matmul(ValueType *dst, ValueType *src_a, ValueType *src_b, int a, int b, int c, bool transpose_b) const {
@@ -357,6 +440,7 @@ namespace autograd {
         }
 
     private:
+        bool _view;
         ValueType *_data;
         Shape _shape;
     };
@@ -364,22 +448,22 @@ namespace autograd {
     typedef Tensor<float> Tensorf;
 
     template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
-    std::ostream& operator<<(std::ostream& os, const autograd::Tensor<ValueType, AllocatorType>& t) {
+    std::ostream& operator<<(std::ostream& os, const Tensor<ValueType, AllocatorType>& t) {
         if (t.shape().dim() <= 1) {
             int len = t.shape()[0];
-            os << "[";
+            os << "(";
             for (int i = 0; i < len; i++) {
                 os << t(i);
                 if (i != len - 1) os << ",";
             }
-            os << "]";
+            os << ") ";
         } else {
-            os << "[" << std::endl;
+            os << "[";
             int len = t.shape()[0];
             for (int i = 0; i < len; i++) {
-                os << t[i] << std::endl;
+                os << t[i];
             }
-            os << "]";
+            os << "] ";
         }
         return os;
     }
