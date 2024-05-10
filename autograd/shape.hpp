@@ -27,6 +27,13 @@ bool operator==(const Shape &rhs) const {
     return true;
 }
 
+bool operator!=(const Shape &rhs) const {
+    for (int i = 0; i < dim(); i++) {
+        if ((*this)[i] != rhs[i]) return true;
+    }
+    return false;
+}
+
 size_t dim() const {
     return size();
 }

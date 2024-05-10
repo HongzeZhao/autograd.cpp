@@ -1,21 +1,82 @@
 #pragma once
 #include <ostream>
+#include <random>
+#include <cmath>
 #include "shape.hpp"
 #include "allocator.hpp"
 
 
 namespace autograd {
-    template <typename DataType, typename AllocatorType=Allocator<DataType>>
+    template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
     class Tensor {
     public:
         explicit Tensor(Shape shape): _shape(shape) {
-            int len = shape.numel();
-            _data = AllocatorType::alloc(len);
+            this->_data = AllocatorType::alloc(_shape.numel());
         }
 
         // shallow copy
-        Tensor(DataType *data, Shape shape): _shape(shape) {
-            _data = data;
+        Tensor(ValueType *data, Shape shape): _shape(shape) {
+            this->_data = data;
+        }
+
+        Tensor(const std::initializer_list<ValueType>& init_list) {
+            _shape.push_back(init_list.size());
+            this->_data = AllocatorType::alloc(_shape.numel());
+            ValueType *p = this->_data;
+            for (ValueType v : init_list) {
+                (*p++) = v;
+            }
+        }
+
+        Tensor(const std::initializer_list<std::initializer_list<ValueType>>& init_list) {
+            _shape.push_back(init_list.size());
+            if (init_list.size() > 0) {
+                _shape.push_back(init_list.begin()->size());
+            }
+            this->_data = AllocatorType::alloc(_shape.numel());
+            ValueType *p = this->_data;
+            for (const auto &il : init_list) {
+                for (ValueType v : il) (*p++) = v;
+            }
+        }
+
+        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>& init_list) {
+            _shape.push_back(init_list.size());
+            if (init_list.size() > 0) {
+                _shape.push_back(init_list.begin()->size());
+                if (init_list.begin()->size() > 0) {
+                    _shape.push_back(init_list.begin()->begin()->size());
+                }
+            }
+            this->_data = AllocatorType::alloc(_shape.numel());
+            ValueType *p = this->_data;
+            for (const auto &il : init_list) {
+                for (const auto &ill : il) {
+                    for (ValueType v : ill) (*p++) = v;
+                }
+            }
+        }
+
+        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>>& init_list) {
+            _shape.push_back(init_list.size());
+            if (init_list.size() > 0) {
+                _shape.push_back(init_list.begin()->size());
+                if (init_list.begin()->size() > 0) {
+                    _shape.push_back(init_list.begin()->begin()->size());
+                    if (init_list.begin()->begin()->size() > 0) {
+                        _shape.push_back(init_list.begin()->begin()->begin()->size());
+                    }
+                }
+            }
+            this->_data = AllocatorType::alloc(_shape.numel());
+            ValueType *p = this->_data;
+            for (const auto &il : init_list) {
+                for (const auto &ill : il) {
+                    for (const auto &illl : ill) {
+                        for (ValueType v : illl) (*p++) = v;
+                    }
+                }
+            }
         }
 
         const Shape& shape() const {
@@ -23,36 +84,64 @@ namespace autograd {
         }
 
         /**
+        * fill all element with a single value
+        */
+        void fill(ValueType val) {
+            int len = _shape.numel();
+            for (int i = 0; i < len; i++) {
+                this->_data[i] = val;
+            }
+        }
+
+        void fillGaussianRandom(ValueType mean, ValueType stddev) {
+            std::default_random_engine generator;
+            std::normal_distribution<ValueType> distribution(mean, stddev);
+            int len = _shape.numel();
+            for (int i = 0; i < len; i++) {
+                this->_data[i] = distribution(generator);
+            }
+        }
+
+        void fillUniformRandom(ValueType low, ValueType high) {
+            std::default_random_engine generator;
+            std::uniform_real_distribution<ValueType> distribution(low, high);
+            int len = _shape.numel();
+            for (int i = 0; i < len; i++) {
+                this->_data[i] = distribution(generator);
+            }
+        }
+
+        /**
         * a view of the original tensor
         */
-        Tensor<DataType> operator[](int i) const {
+        Tensor<ValueType> operator[](int i) const {
             Shape shape;
             for (int j = 0; j < _shape.dim()-1; j++) {
                 shape.push_back(_shape[j+1]);
             }
             int offset = i * shape.numel();
-            return Tensor<DataType>(_data + offset, shape);
+            return Tensor<ValueType>(_data + offset, shape);
         }
 
-        DataType operator()(int i) const {
+        ValueType operator()(int i) const {
             assert(_shape.dim() == 1);
             return *(_data + i);
         }
 
-        DataType operator()(int i, int j) const {
+        ValueType operator()(int i, int j) const {
             assert(_shape.dim() == 2);
             int n1 = _shape[1];
             return *(_data + i * n1 + j);
         }
 
-        DataType operator()(int i, int j, int k) const {
+        ValueType operator()(int i, int j, int k) const {
             assert(_shape.dim() == 3);
             int n1 = _shape[1];
             int n2 = _shape[2];
             return *(_data + i * n1 + j*n2 + k);
         }
 
-        DataType operator()(int i, int j, int k, int l) const {
+        ValueType operator()(int i, int j, int k, int l) const {
             assert(_shape.dim() == 4);
             int n1 = _shape[1];
             int n2 = _shape[2];
@@ -60,31 +149,33 @@ namespace autograd {
             return *(_data + i * n1 + j*n2 + k*n3 + l);
         }
 
-        DataType& operator()(int i) {
+        ValueType& operator()(int i) {
             assert(_shape.dim() == 1);
             return *(_data + i);
         }
 
-        DataType& operator()(int i, int j) {
+        ValueType& operator()(int i, int j) {
             assert(_shape.dim() == 2);
             int n1 = _shape[1];
             return *(_data + i * n1 + j);
         }
 
-        DataType& operator()(int i, int j, int k) {
+        ValueType& operator()(int i, int j, int k) {
             assert(_shape.dim() == 3);
             int n1 = _shape[1];
             int n2 = _shape[2];
             return *(_data + i * n1 + j*n2 + k);
         }
 
-        DataType& operator()(int i, int j, int k, int l) {
+        ValueType& operator()(int i, int j, int k, int l) {
             assert(_shape.dim() == 4);
             int n1 = _shape[1];
             int n2 = _shape[2];
             int n3 = _shape[3];
             return *(_data + i * n1 + j*n2 + k*n3 + l);
         }
+
+        // operators
 
         Tensor operator+(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
@@ -96,15 +187,184 @@ namespace autograd {
             return ret;
         }
 
+        Tensor operator-(const Tensor &rhs) const {
+            assert(_shape == rhs.shape());
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] - rhs._data[i];
+            }
+            return ret;
+        }
+
+        Tensor operator-() const {
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = -_data[i];
+            }
+            return ret;
+        }
+
+        Tensor operator*(const Tensor &rhs) const {
+            assert(_shape == rhs.shape());
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] * rhs._data[i];
+            }
+            return ret;
+        }
+
+        Tensor operator*(ValueType a) const {
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] * a;
+            }
+            return ret;
+        }
+
+        Tensor operator/(const Tensor &rhs) const {
+            assert(_shape == rhs.shape());
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] / rhs._data[i];
+            }
+            return ret;
+        }
+
+        Tensor operator/(ValueType a) const {
+            assert(a != 0);
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] / a;
+            }
+            return ret;
+        }
+
+        Tensor operator^(ValueType exp) const {
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = std::powf(_data[i], exp);
+            }
+            return ret;
+        }
+
+        bool operator==(const Tensor &rhs) const {
+            if (_shape != rhs) return false;
+            for (int i = 0; i < _shape.numel(); i++) {
+                if (_data[i] != rhs._data[i]) return false;
+            }
+            return true;
+        }
+
+        bool operator!=(const Tensor &rhs) const {
+            if (_shape != rhs) return true;
+            for (int i = 0; i < _shape.numel(); i++) {
+                if (_data[i] != rhs._data[i]) return true;
+            }
+            return false;
+        }
+
+        /**
+        * This is matrix product, not element-wise product.
+        * A Tensor of the same type as a and b where each inner-most matrix is the
+        * product of the corresponding matrices in a and b, e.g. if all transpose or
+        * adjoint attributes are False:
+        * output[..., i, j] = sum_k (a[..., i, k] * b[..., k, j]), for all indices i, j.
+        */
+        Tensor matmul(const Tensor &rhs, bool transpose_b=false) const {
+            int dim = _shape.dim();
+            assert(dim == rhs.shape().dim());
+            assert(dim >= 2);
+            Shape shape;
+            for (int i = 0; i < dim - 2; i++) {
+                assert(_shape[i] == rhs.shape()[i]);
+                shape.push_back(_shape[i]);
+            }
+
+            if (transpose_b) {
+                assert(_shape[dim - 1] == rhs.shape()[dim - 1]);
+                shape.push_back(_shape[dim - 2]);
+                shape.push_back(rhs.shape()[dim - 2]);
+                Tensor ret(shape);
+                
+                int a = _shape[dim - 2];
+                int b = _shape[dim - 1];
+                int c = rhs.shape()[dim - 2];
+
+                int block_size_a = a * b;
+                int block_size_b = b * c;
+                int block_size_ret = a * c;
+                int numel = shape.numel();
+                ValueType *dst = ret._data;
+                ValueType *src_a = this->_data;
+                ValueType *src_b = rhs._data;
+
+                for (int i = 0; i < numel; i += block_size_ret) {
+                    _matmul(dst, src_a, src_b, a, b, c, true);
+                    src_a += block_size_a;
+                    src_b += block_size_b;
+                    dst += block_size_ret;
+                }
+                return ret;
+            } else {
+                assert(_shape[dim - 1] == rhs.shape()[dim - 2]);
+                shape.push_back(_shape[dim - 2]);
+                shape.push_back(rhs.shape()[dim - 1]);
+                Tensor ret(shape);
+
+                int a = _shape[dim - 2];
+                int b = _shape[dim - 1];
+                int c = rhs.shape()[dim - 1];
+
+                int block_size_a = a * b;
+                int block_size_b = b * c;
+                int block_size_ret = a * c;
+                int numel = shape.numel();
+                ValueType *dst = ret._data;
+                ValueType *src_a = this->_data;
+                ValueType *src_b = rhs._data;
+                for (int i = 0; i < numel; i += block_size_ret) {
+                    _matmul(dst, src_a, src_b, a, b, c, false);
+                    src_a += block_size_a;
+                    src_b += block_size_b;
+                    dst += block_size_ret;
+                }
+                return ret;
+            }
+        }
+
     private:
-        DataType *_data;
+        // M(axb) x M(bxc) = M(axc)
+        void _matmul(ValueType *dst, ValueType *src_a, ValueType *src_b, int a, int b, int c, bool transpose_b) const {
+            for (int i = 0; i < a; i++) {
+                for (int j = 0; j < c; j++) {
+                    ValueType *p = dst + (i * c + j);
+                    for (int k = 0; k < b; k++) {
+                        if (transpose_b) {
+                            *p += *(src_a + i * b + k) * (*(src_b + j * b + k));
+                        } else {
+                            *p += *(src_a + i * b + k) * (*(src_b + k * c + j));
+                        }
+                    }
+                }
+            }
+        }
+
+    private:
+        ValueType *_data;
         Shape _shape;
     };
 
     typedef Tensor<float> Tensorf;
 
-    template <typename DataType, typename AllocatorType=Allocator<DataType>>
-    std::ostream& operator<<(std::ostream& os, const autograd::Tensor<DataType, AllocatorType>& t) {
+    template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
+    std::ostream& operator<<(std::ostream& os, const autograd::Tensor<ValueType, AllocatorType>& t) {
         if (t.shape().dim() <= 1) {
             int len = t.shape()[0];
             os << "[";
