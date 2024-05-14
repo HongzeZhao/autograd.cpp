@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <ostream>
 #include <random>
 #include <cmath>
@@ -419,6 +420,30 @@ namespace autograd {
                 }
                 ret._data[t] = this->_data[i];
             }
+            return ret;
+        }
+
+        /**
+        * Computes the sum of elements across dimensions of a tensor.
+        * axis starts with 0.
+        * Reduces input_tensor along the dimensions given in axis. Unless keepdims is true,
+        * the rank of the tensor is reduced by 1 for each of the entries in axis, which must be unique.
+        * If keepdims is true, the reduced dimensions are retained with length 1.
+        * If axis is None, all dimensions are reduced, and a tensor with a single element is returned.
+        */
+        Tensor reduceSum(Shape axis={}, bool keep_dims=false) const {
+            Shape shape;
+            for (int d = 0; d < _shape.dim(); d++) {
+                if (std::find(axis.begin(), axis.end(), d) != axis.end()) {
+                    if (keep_dims) shape.push_back(1);
+                } else {
+                    shape.push_back(_shape[d]);
+                }
+            }
+            Tensor ret(shape);
+
+            // TODO: finish
+
             return ret;
         }
 

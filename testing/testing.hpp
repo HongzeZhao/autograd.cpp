@@ -15,7 +15,7 @@ struct TestClassBase {
 #define Assert(expr) assert((expr) ? (void)0 : fail(#expr))
 #define fail(str)   (std::cerr << "Assert failed: " << str << std::endl, 1)
 
-#define TEST_CASE(CASE_NAME, ...) \
+#define TestCase(CASE_NAME, ...) \
 struct Test##CASE_NAME : public TestClassBase { \
     Test##CASE_NAME() : TestClassBase(#CASE_NAME) { \
         run(); \
@@ -29,5 +29,6 @@ static Test##CASE_NAME _test_case_##CASE_NAME;
 
 #define RUN_ALL_TESTS() \
 int main(int argc, char*argv[]) { \
+    std::cout << "finished running all test cases." << std::endl; \
     return 0; \
 }

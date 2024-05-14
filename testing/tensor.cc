@@ -7,7 +7,7 @@
 
 using namespace std;
 
-TEST_CASE(BasicOps, {
+TestCase(BasicOps, {
     autograd::Shape shape = autograd::make_shape(6, 4);
     cout << "dim:" << shape.dim() << endl;
     for (int i = 0; i < shape.dim(); i++) {
@@ -29,7 +29,7 @@ TEST_CASE(BasicOps, {
     cout << "t1 / 2=" << t1 / 2 << endl;
 });
 
-TEST_CASE(MatmulAndTranspose, {
+TestCase(MatmulAndTranspose, {
     autograd::Tensorf a = {
         {{0, 1}, {2, 3}, {4, 5}},
         {{0, 1}, {2, 3}, {4, 5}},
@@ -54,5 +54,3 @@ TEST_CASE(MatmulAndTranspose, {
     cout << "x = " << x << endl;
     cout << "x.transpose() = " << x.transpose() << endl;
 });
-
-RUN_ALL_TESTS();
