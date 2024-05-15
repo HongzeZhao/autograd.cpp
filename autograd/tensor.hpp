@@ -31,7 +31,7 @@ namespace autograd {
         Tensor(Shape shape, ValueType value): _shape(shape), _view(false) {
             int n = _shape.numel();
             this->_data = AllocatorType::alloc(n);
-            for (int i = 0; i < n; i++) _data[i] = value;
+            fill(value);
         }
 
         Tensor(const Tensor &rhs): _view(rhs._view) {
@@ -154,6 +154,9 @@ namespace autograd {
             }
         }
 
+        /**
+        * fill all elements by uniform gaussian with range of mean and stddev
+        */
         void fillGaussianRandom(ValueType mean, ValueType stddev) {
             std::normal_distribution<ValueType> distribution(mean, stddev);
             int len = _shape.numel();
@@ -162,6 +165,9 @@ namespace autograd {
             }
         }
 
+        /**
+        * fill all elements by uniform random with range of [low, high]
+        */
         void fillUniformRandom(ValueType low, ValueType high) {
             std::uniform_real_distribution<ValueType> distribution(low, high);
             int len = _shape.numel();
@@ -182,6 +188,9 @@ namespace autograd {
             return Tensor<ValueType>(_data + offset, shape);
         }
 
+        /**
+        * const element accessor with a index vector.
+        */
         ValueType operator()(const std::vector<int> &index) const {
             int n = _shape.numel();
             int pos = 0;
@@ -192,6 +201,9 @@ namespace autograd {
             return *(_data + pos);
         }
 
+        /**
+        * element accessor with a index vector.
+        */
         ValueType& operator()(const std::vector<int> &index) {
             int n = _shape.numel();
             int pos = 0;
@@ -202,17 +214,26 @@ namespace autograd {
             return *(_data + pos);
         }
 
+        /**
+        * const element accessor for a tensor with shape(A)
+        */
         ValueType operator()(int i) const {
             assert(_shape.dim() == 1);
             return *(_data + i);
         }
 
+        /**
+        * const element accessor for a tensor with shape(A,B)
+        */
         ValueType operator()(int i, int j) const {
             assert(_shape.dim() == 2);
             int n1 = _shape[1];
             return *(_data + i * n1 + j);
         }
 
+        /**
+        * const element accessor for a tensor with shape(A,B,C)
+        */
         ValueType operator()(int i, int j, int k) const {
             assert(_shape.dim() == 3);
             int n1 = _shape[1];
@@ -220,6 +241,9 @@ namespace autograd {
             return *(_data + i * n1 + j*n2 + k);
         }
 
+        /**
+        * const element accessor for a tensor with shape(A,B,C,D)
+        */
         ValueType operator()(int i, int j, int k, int l) const {
             assert(_shape.dim() == 4);
             int n1 = _shape[1];
@@ -228,17 +252,26 @@ namespace autograd {
             return *(_data + i * n1 + j*n2 + k*n3 + l);
         }
 
+        /**
+        * element accessor for a tensor with shape(A)
+        */
         ValueType& operator()(int i) {
             assert(_shape.dim() == 1);
             return *(_data + i);
         }
 
+        /**
+        * element accessor for a tensor with shape(A,B)
+        */
         ValueType& operator()(int i, int j) {
             assert(_shape.dim() == 2);
             int n1 = _shape[1];
             return *(_data + i * n1 + j);
         }
 
+        /**
+        * element accessor for a tensor with shape(A,B,C)
+        */
         ValueType& operator()(int i, int j, int k) {
             assert(_shape.dim() == 3);
             int n1 = _shape[1];
@@ -246,6 +279,9 @@ namespace autograd {
             return *(_data + i * n1 + j*n2 + k);
         }
 
+        /**
+        * element accessor for a tensor with shape(A,B,C,D)
+        */
         ValueType& operator()(int i, int j, int k, int l) {
             assert(_shape.dim() == 4);
             int n1 = _shape[1];
@@ -254,7 +290,9 @@ namespace autograd {
             return *(_data + i * n1 + j*n2 + k*n3 + l);
         }
 
-        // operators
+        /**
+        * element-wise operator +
+        */
         Tensor operator+(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
             Tensor ret(_shape);
@@ -265,6 +303,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator +
+        */
         Tensor operator+(ValueType val) const {
             Tensor ret(_shape);
             int numel = _shape.numel();
@@ -274,6 +315,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator -
+        */
         Tensor operator-(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
             Tensor ret(_shape);
@@ -284,6 +328,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator -
+        */
         Tensor operator-(ValueType val) const {
             Tensor ret(_shape);
             int numel = _shape.numel();
@@ -293,6 +340,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator negative
+        */
         Tensor operator-() const {
             Tensor ret(_shape);
             int numel = _shape.numel();
@@ -302,6 +352,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator *
+        */
         Tensor operator*(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
             Tensor ret(_shape);
@@ -312,6 +365,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator *
+        */
         Tensor operator*(ValueType a) const {
             Tensor ret(_shape);
             int numel = _shape.numel();
@@ -321,6 +377,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator /
+        */
         Tensor operator/(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
             Tensor ret(_shape);
@@ -331,6 +390,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator /
+        */
         Tensor operator/(ValueType a) const {
             assert(a != 0);
             Tensor ret(_shape);
@@ -341,6 +403,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise operator power
+        */
         Tensor operator^(ValueType exp) const {
             Tensor ret(_shape);
             int numel = _shape.numel();
@@ -350,6 +415,9 @@ namespace autograd {
             return ret;
         }
 
+        /**
+        * element-wise equal check
+        */
         bool operator==(const Tensor &rhs) const {
             if (_shape != rhs.shape()) return false;
             for (int i = 0; i < _shape.numel(); i++) {
@@ -358,6 +426,9 @@ namespace autograd {
             return true;
         }
 
+        /**
+        * element-wise non-equal check
+        */
         bool operator!=(const Tensor &rhs) const {
             if (_shape != rhs.shape()) return true;
             for (int i = 0; i < _shape.numel(); i++) {
@@ -366,6 +437,9 @@ namespace autograd {
             return false;
         }
 
+        /**
+        * element-wise operator +=
+        */
         Tensor &operator+=(const Tensor &rhs) {
             assert(_shape == rhs.shape());
             int numel = _shape.numel();
@@ -375,6 +449,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator -=
+        */
         Tensor &operator-=(const Tensor &rhs) {
             assert(_shape == rhs.shape());
             int numel = _shape.numel();
@@ -384,6 +461,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator *=
+        */
         Tensor &operator*=(const Tensor &rhs) {
             assert(_shape == rhs.shape());
             int numel = _shape.numel();
@@ -393,6 +473,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator /=
+        */
         Tensor &operator/=(const Tensor &rhs) {
             assert(_shape == rhs.shape());
             int numel = _shape.numel();
@@ -402,6 +485,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator +=
+        */
         Tensor &operator+=(ValueType val) {
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
@@ -410,6 +496,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator -=
+        */
         Tensor &operator-=(ValueType val) {
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
@@ -418,6 +507,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator *=
+        */
         Tensor &operator*=(ValueType val) {
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
@@ -426,6 +518,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator /=
+        */
         Tensor &operator/=(ValueType val) {
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
@@ -434,6 +529,9 @@ namespace autograd {
             return *this;
         }
 
+        /**
+        * element-wise operator power
+        */
         Tensor &operator^=(ValueType exp) {
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
@@ -551,9 +649,8 @@ namespace autograd {
         }
 
         /**
-        * Computes the sum of elements across dimensions of a tensor.
-        * axis starts with 0.
-        * Reduces input_tensor along the dimensions given in axis. Unless keepdims is true,
+        * Computes the sum of elements across dimensions of a tensor, axis starts with 0.
+        * Reduces along the dimensions given in axis. Unless keepdims is true,
         * the rank of the tensor is reduced by 1 for each of the entries in axis, which must be unique.
         * If keepdims is true, the reduced dimensions are retained with length 1.
         * If axis is None, all dimensions are reduced, and a tensor with a single element is returned.
@@ -562,16 +659,37 @@ namespace autograd {
             return _reduce(axis, keep_dims, [](ValueType &dst, ValueType src) {dst += src;}, 0);
         }
 
+        /**
+        * Computes the maximum of elements across dimensions of a tensor, axis starts with 0.
+        * Reduces along the dimensions given in axis. Unless keepdims is true,
+        * the rank of the tensor is reduced by 1 for each of the entries in axis, which must be unique.
+        * If keepdims is true, the reduced dimensions are retained with length 1.
+        * If axis is None, all dimensions are reduced, and a tensor with a single element is returned.
+        */
         Tensor reduceMax(Axis axis={}, bool keep_dims=false) const {
             ValueType initVal = -std::numeric_limits<ValueType>::max();
             return _reduce(axis, keep_dims, [](ValueType &dst, ValueType src) {dst = std::max(dst, src);}, initVal);
         }
 
+        /**
+        * Computes the minimum of elements across dimensions of a tensor, axis starts with 0.
+        * Reduces along the dimensions given in axis. Unless keepdims is true,
+        * the rank of the tensor is reduced by 1 for each of the entries in axis, which must be unique.
+        * If keepdims is true, the reduced dimensions are retained with length 1.
+        * If axis is None, all dimensions are reduced, and a tensor with a single element is returned.
+        */
         Tensor reduceMin(Axis axis={}, bool keep_dims=false) const {
             ValueType initVal = std::numeric_limits<ValueType>::max();
             return _reduce(axis, keep_dims, [](ValueType &dst, ValueType src) {dst = std::min(dst, src);}, initVal);
         }
 
+        /**
+        * Computes the mean of elements across dimensions of a tensor, axis starts with 0.
+        * Reduces along the dimensions given in axis. Unless keepdims is true,
+        * the rank of the tensor is reduced by 1 for each of the entries in axis, which must be unique.
+        * If keepdims is true, the reduced dimensions are retained with length 1.
+        * If axis is None, all dimensions are reduced, and a tensor with a single element is returned.
+        */
         Tensor reduceMean(Axis axis={}, bool keep_dims=false) const {
             int n = 1;
             if (axis.empty()) {
@@ -586,6 +704,9 @@ namespace autograd {
             return _reduce(axis, keep_dims, [&n](ValueType &dst, ValueType src) {dst += src / n;}, 0);
         }
 
+        /**
+        * return the only value of the tensor with shape (1)
+        */
         ValueType value() const {
             assert(_shape.dim() == 1);
             assert(_shape[0] == 1);
