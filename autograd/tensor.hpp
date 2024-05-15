@@ -24,11 +24,11 @@ namespace autograd {
     template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
     class Tensor {
     public:
-        explicit Tensor(Shape shape): _shape(shape), _view(false) {
+        explicit Tensor(const Shape &shape): _shape(shape), _view(false) {
             this->_data = AllocatorType::alloc(_shape.numel());
         }
 
-        Tensor(Shape shape, ValueType value): _shape(shape), _view(false) {
+        Tensor(const Shape &shape, ValueType value): _shape(shape), _view(false) {
             int n = _shape.numel();
             this->_data = AllocatorType::alloc(n);
             fill(value);
@@ -61,13 +61,13 @@ namespace autograd {
         Tensor & operator=(const Tensor &&rhs) {
             this->_view = rhs._view;
             this->_data = rhs._data;
-            this->_shape = std::move(rhs._shape);
+            this->_shape = rhs._shape;
             rhs._view = true;
             return *this;
         }
 
         // shallow copy
-        Tensor(ValueType *data, Shape shape): _shape(shape), _view(true) {
+        Tensor(ValueType *data, const Shape &shape): _shape(shape), _view(true) {
             this->_data = data;
         }
 
@@ -140,40 +140,74 @@ namespace autograd {
             }
         }
 
+        /**
+        * get tensor shape
+        */
         const Shape& shape() const {
             return _shape;
         }
 
         /**
+        * Reshapes a tensor.
+        * If one component of shape is the special value -1, the size of that dimension is computed
+        * so that the total size remains constant. In particular, a shape of [-1] flattens into 1-D.
+        * At most one component of shape can be -1.
+        */
+        Tensor &reshape(const Shape &shape) {
+            _shape = shape;
+            int cur_numel = _shape.numel();
+            int numel = shape.numel();
+            if (numel != cur_numel) {
+                assert(numel < 0);
+                int derive_dim = -1;
+                for (int d = 0; d < shape.dim(); d++) {
+                    if (shape[d] < 0) {
+                        derive_dim = d;
+                    } else {
+                        assert(cur_numel % shape[d] == 0);
+                        cur_numel /= shape[d];
+                    }
+                }
+                assert(derive_dim >= 0);
+                assert(cur_numel > 0);
+                _shape[derive_dim] = cur_numel;
+            }
+            return *this;
+        }
+
+        /**
         * fill all element with a single value
         */
-        void fill(ValueType val) {
+        Tensor &fill(ValueType val) {
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
                 this->_data[i] = val;
             }
+            return *this;
         }
 
         /**
         * fill all elements by uniform gaussian with range of mean and stddev
         */
-        void fillGaussianRandom(ValueType mean, ValueType stddev) {
+        Tensor &fillGaussianRandom(ValueType mean, ValueType stddev) {
             std::normal_distribution<ValueType> distribution(mean, stddev);
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
                 this->_data[i] = distribution(_gRandomGenerator);
             }
+            return *this;
         }
 
         /**
         * fill all elements by uniform random with range of [low, high]
         */
-        void fillUniformRandom(ValueType low, ValueType high) {
+        Tensor &fillUniformRandom(ValueType low, ValueType high) {
             std::uniform_real_distribution<ValueType> distribution(low, high);
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
                 this->_data[i] = distribution(_gRandomGenerator);
             }
+            return *this;
         }
 
         /**
@@ -186,6 +220,29 @@ namespace autograd {
             }
             int offset = i * shape.numel();
             return Tensor<ValueType>(_data + offset, shape);
+        }
+
+        /**
+        * element accessor with a index vector.
+        */
+        ValueType operator()(const std::function<ValueType(ValueType)> &mapper) const {
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = mapper(_data[i]);
+            }
+            return ret;
+        }
+
+        /**
+        * element accessor with a index vector.
+        */
+        ValueType& operator()(const std::function<ValueType(ValueType)> &mapper) {
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] = mapper(_data[i]);
+            }
+            return *this;
         }
 
         /**
@@ -782,7 +839,7 @@ namespace autograd {
         }
 
     private:
-        bool _view;
+        bool _view; // the destructor does not free _data if true (tensor is build with shallow copy)
         ValueType *_data;
         Shape _shape;
     };

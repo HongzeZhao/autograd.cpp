@@ -14,8 +14,8 @@ public:
     */
     int numel() const {
         int len = 1;
-        for (int i = 0; i < dim(); i++) {
-            len *= (*this)[i];
+        for (auto it = begin(); it != end(); ++it) {
+            len *= (*it);
         }
         return len;
     }

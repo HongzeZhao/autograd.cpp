@@ -133,3 +133,9 @@ TestCase(MatmulAndTranspose, {
     Assert(x.reduceMax({1}) == Tensorf({2, 4}));
     Assert(x.reduceMean({1}) == Tensorf({1.5, 3.5}));
 });
+
+TestCase(Reshape, {
+    Tensorf x = {{1, 2, 3, 4}, {5, 6, 7, 8}};
+    x.reshape({2, 2, 2});
+    Assert(x == Tensorf({{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}}));
+});
