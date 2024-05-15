@@ -1,21 +1,37 @@
 #pragma once
 #include <algorithm>
+#include <cstdio>
 #include <ostream>
 #include <random>
 #include <cmath>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
-#include <iostream>
+#include <unordered_set>
+#include <ctime>
+#include <limits>
 #include "shape.hpp"
 #include "allocator.hpp"
 
-
 namespace autograd {
+    typedef std::unordered_set<int> Axis;
+    typedef std::vector<int> AxisPerm;
+    typedef std::vector<int> Index;
+
+    static std::random_device _gRandomDevice;
+    static std::default_random_engine _gRandomGenerator(_gRandomDevice());
+
     template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
     class Tensor {
     public:
         explicit Tensor(Shape shape): _shape(shape), _view(false) {
             this->_data = AllocatorType::alloc(_shape.numel());
+        }
+
+        Tensor(Shape shape, ValueType value): _shape(shape), _view(false) {
+            int n = _shape.numel();
+            this->_data = AllocatorType::alloc(n);
+            for (int i = 0; i < n; i++) _data[i] = value;
         }
 
         Tensor(const Tensor &rhs): _view(rhs._view) {
@@ -64,7 +80,7 @@ namespace autograd {
             }
         }
 
-        Tensor(const std::initializer_list<std::initializer_list<ValueType>>& init_list): _view(false) {
+        Tensor(const std::initializer_list<std::vector<ValueType>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
                 _shape.push_back(init_list.begin()->size());
@@ -76,7 +92,7 @@ namespace autograd {
             }
         }
 
-        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>& init_list): _view(false) {
+        Tensor(const std::initializer_list<std::vector<std::vector<ValueType>>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
                 _shape.push_back(init_list.begin()->size());
@@ -93,7 +109,7 @@ namespace autograd {
             }
         }
 
-        Tensor(const std::initializer_list<std::initializer_list<std::initializer_list<std::initializer_list<ValueType>>>>& init_list): _view(false) {
+        Tensor(const std::initializer_list<std::vector<std::vector<std::vector<ValueType>>>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
                 _shape.push_back(init_list.begin()->size());
@@ -139,20 +155,18 @@ namespace autograd {
         }
 
         void fillGaussianRandom(ValueType mean, ValueType stddev) {
-            std::default_random_engine generator;
             std::normal_distribution<ValueType> distribution(mean, stddev);
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
-                this->_data[i] = distribution(generator);
+                this->_data[i] = distribution(_gRandomGenerator);
             }
         }
 
         void fillUniformRandom(ValueType low, ValueType high) {
-            std::default_random_engine generator;
             std::uniform_real_distribution<ValueType> distribution(low, high);
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
-                this->_data[i] = distribution(generator);
+                this->_data[i] = distribution(_gRandomGenerator);
             }
         }
 
@@ -166,6 +180,26 @@ namespace autograd {
             }
             int offset = i * shape.numel();
             return Tensor<ValueType>(_data + offset, shape);
+        }
+
+        ValueType operator()(const std::vector<int> &index) const {
+            int n = _shape.numel();
+            int pos = 0;
+            for (int d = 0; d < _shape.dim(); d++) {
+                n /= _shape[d];
+                pos += index[d] * n;
+            }
+            return *(_data + pos);
+        }
+
+        ValueType& operator()(const std::vector<int> &index) {
+            int n = _shape.numel();
+            int pos = 0;
+            for (int d = 0; d < _shape.dim(); d++) {
+                n /= _shape[d];
+                pos += index[d] * n;
+            }
+            return *(_data + pos);
         }
 
         ValueType operator()(int i) const {
@@ -300,7 +334,7 @@ namespace autograd {
         }
 
         bool operator==(const Tensor &rhs) const {
-            if (_shape != rhs) return false;
+            if (_shape != rhs.shape()) return false;
             for (int i = 0; i < _shape.numel(); i++) {
                 if (_data[i] != rhs._data[i]) return false;
             }
@@ -308,7 +342,7 @@ namespace autograd {
         }
 
         bool operator!=(const Tensor &rhs) const {
-            if (_shape != rhs) return true;
+            if (_shape != rhs.shape()) return true;
             for (int i = 0; i < _shape.numel(); i++) {
                 if (_data[i] != rhs._data[i]) return true;
             }
@@ -391,14 +425,14 @@ namespace autograd {
         * If perm is not given, it is set to (n-1...0), where n is the rank of the input tensor.
         * Hence, by default, this operation performs a regular matrix transpose on 2-D input Tensors.
         */
-        Tensor transpose(Shape perm={}) const {
+        Tensor transpose(AxisPerm perm={}) const {
             if (_shape.dim() <= 1) return *this;
 
             int dim = _shape.dim();
-            if (perm.dim() == 0) {
+            if (perm.empty()) {
                 for (int i = dim - 1; i >= 0; i--) perm.push_back(i);
             }
-            assert(perm.dim() == _shape.dim());
+            assert(perm.size() == _shape.dim());
 
             Shape shape;
             for (auto d : perm) shape.push_back(_shape[d]);
@@ -431,25 +465,44 @@ namespace autograd {
         * If keepdims is true, the reduced dimensions are retained with length 1.
         * If axis is None, all dimensions are reduced, and a tensor with a single element is returned.
         */
-        Tensor reduceSum(Shape axis={}, bool keep_dims=false) const {
-            Shape shape;
-            for (int d = 0; d < _shape.dim(); d++) {
-                if (std::find(axis.begin(), axis.end(), d) != axis.end()) {
-                    if (keep_dims) shape.push_back(1);
-                } else {
-                    shape.push_back(_shape[d]);
+        Tensor reduceSum(Axis axis={}, bool keep_dims=false) const {
+            return _reduce(axis, keep_dims, [](ValueType &dst, ValueType src) {dst += src;}, 0);
+        }
+
+        Tensor reduceMax(Axis axis={}, bool keep_dims=false) const {
+            ValueType initVal = -std::numeric_limits<ValueType>::max();
+            return _reduce(axis, keep_dims, [](ValueType &dst, ValueType src) {dst = std::max(dst, src);}, initVal);
+        }
+
+        Tensor reduceMin(Axis axis={}, bool keep_dims=false) const {
+            ValueType initVal = std::numeric_limits<ValueType>::max();
+            return _reduce(axis, keep_dims, [](ValueType &dst, ValueType src) {dst = std::min(dst, src);}, initVal);
+        }
+
+        Tensor reduceMean(Axis axis={}, bool keep_dims=false) const {
+            int n = 1;
+            if (axis.empty()) {
+                n = _shape.numel();
+            } else {
+                for (int d = 0; d < _shape.dim(); d++) {
+                    if (axis.count(d)) {
+                        n *= _shape[d];
+                    }
                 }
             }
-            Tensor ret(shape);
+            return _reduce(axis, keep_dims, [&n](ValueType &dst, ValueType src) {dst += src / n;}, 0);
+        }
 
-            // TODO: finish
-
-            return ret;
+        ValueType value() const {
+            assert(_shape.dim() == 1);
+            assert(_shape[0] == 1);
+            return _data[0];
         }
 
     private:
         // M(axb) x M(bxc) = M(axc)
-        void _matmul(ValueType *dst, ValueType *src_a, ValueType *src_b, int a, int b, int c, bool transpose_b) const {
+        // matmul block matrix (last 2 dims)
+        static void _matmul(ValueType *dst, ValueType *src_a, ValueType *src_b, int a, int b, int c, bool transpose_b) {
             for (int i = 0; i < a; i++) {
                 for (int j = 0; j < c; j++) {
                     ValueType *p = dst + (i * c + j);
@@ -460,6 +513,56 @@ namespace autograd {
                             *p += *(src_a + i * b + k) * (*(src_b + k * c + j));
                         }
                     }
+                }
+            }
+        }
+
+        Tensor _reduce(Axis axis, bool keep_dims, const std::function<void(ValueType&,ValueType)> &reducer, ValueType initVal) const {
+            Shape shape;
+            if (axis.empty()) {
+                for (int d : _shape) shape.push_back(1);
+            } else {
+                for (int d = 0; d < _shape.dim(); d++) {
+                    if (axis.count(d) > 0) {
+                        shape.push_back(1);
+                    } else {
+                        shape.push_back(_shape[d]);
+                    }
+                }
+            }
+
+            Tensor ret(shape, initVal);
+            Index indexDst(_shape.dim(), 0);
+            Index indexSrc(_shape.dim(), 0);
+            _reduce(ret, *this, indexDst, indexSrc, axis, 0, reducer);
+
+            if (!keep_dims) {
+                Shape shapeReduced;
+                for (int d = 0; d < shape.dim(); d++) {
+                    if (!axis.empty() && !axis.count(d)) {
+                        shapeReduced.push_back(shape[d]);
+                    }
+                }
+                if (shapeReduced.empty()) {
+                    shapeReduced.push_back(1);
+                }
+                ret._shape = std::move(shapeReduced);
+            }
+            return ret;
+        }
+
+        static void _reduce(Tensor &dst, const Tensor &src, Index &indexDst, Index &indexSrc, const Axis &axis,
+                            int d, const std::function<void(ValueType&,ValueType)> &reducer) {
+            if (d >= src.shape().dim()) return;
+            bool is_last_dim = (d == src.shape().dim() - 1);
+            bool is_reduce_dim = axis.empty() || axis.count(d);
+            for (int i = 0; i < src.shape()[d]; i++) {
+                indexSrc[d] = i;
+                indexDst[d] = is_reduce_dim ? 0 : i;
+                if (is_last_dim) {
+                    reducer(dst(indexDst), src(indexSrc));
+                } else {
+                    _reduce(dst, src, indexDst, indexSrc, axis, d+1, reducer);
                 }
             }
         }
@@ -491,5 +594,15 @@ namespace autograd {
             os << "] ";
         }
         return os;
+    }
+
+    template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
+    Tensor<ValueType, AllocatorType> operator*(ValueType k, const Tensor<ValueType, AllocatorType>& t) {
+        return t * k;
+    }
+
+    template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
+    Tensor<ValueType, AllocatorType> operator/(ValueType k, const Tensor<ValueType, AllocatorType>& t) {
+        return Tensor<ValueType, AllocatorType>(t.shape(), k) / t;
     }
 }

@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <iostream>
+#include <cassert>
 
 struct TestClassBase {
     std::string name;
@@ -12,8 +13,9 @@ struct TestClassBase {
     virtual ~TestClassBase() = default;
 };
 
-#define Assert(expr) assert((expr) ? (void)0 : fail(#expr))
-#define fail(str)   (std::cerr << "Assert failed: " << str << std::endl, 1)
+#define Assert(expr) (void)(!(expr) ? fail(#expr) : success(#expr))
+#define success(str)   (std::cout << "\033[1;36m" << str << "\033[0m\t\033[1;32m[ok]\033[0m" << std::endl, 0)
+#define fail(str)   (std::cerr << "\033[1;31m" << str << "\t[fail]\033[0m" << std::endl, 1)
 
 #define TestCase(CASE_NAME, ...) \
 struct Test##CASE_NAME : public TestClassBase { \
@@ -21,7 +23,8 @@ struct Test##CASE_NAME : public TestClassBase { \
         run(); \
     } \
     void run() override { \
-         std::cout << "Test" << this->name << " : " << __FILE__ << "(L" << __LINE__ <<")" << std::endl; \
+         std::cout << std::endl << "\033[1;33mTest" << this->name \
+            << " : " << __FILE__ << "(L" << __LINE__ <<")\033[0m" << std::endl; \
          { __VA_ARGS__; } \
     } \
 }; \
