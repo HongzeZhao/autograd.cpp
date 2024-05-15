@@ -41,6 +41,23 @@ TestCase(BasicOps, {
     Assert(2.0f * a == Tensorf({{2, 4}, {6, 8}}));
     Assert(a / 2 == Tensorf({{0.5, 1}, {1.5, 2}}));
     Assert(1.0f / a == Tensorf({{1.0f/1, 1.0f/2}, {1.0f/3.0, 1.0f/4}}));
+
+    a += b;
+    Assert(a == Tensorf({{6, 8}, {10, 12}}));
+    a -= b;
+    Assert(a == Tensorf({{1, 2}, {3, 4}}));
+    a *= b;
+    Assert(a == Tensorf({{5, 12}, {21, 32}}));
+    a /= b;
+    Assert(a == Tensorf({{1, 2}, {3, 4}}));
+    a += 1;
+    Assert(a == Tensorf({{2, 3}, {4, 5}}));
+    a -= 1;
+    Assert(a == Tensorf({{1, 2}, {3, 4}}));
+    a *= 2;
+    Assert(a == Tensorf({{2, 4}, {6, 8}}));
+    a /= 2;
+    Assert(a == Tensorf({{1, 2}, {3, 4}}));
 });
 
 TestCase(MatmulAndTranspose, {

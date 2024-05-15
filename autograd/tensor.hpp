@@ -255,7 +255,6 @@ namespace autograd {
         }
 
         // operators
-
         Tensor operator+(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
             Tensor ret(_shape);
@@ -266,12 +265,30 @@ namespace autograd {
             return ret;
         }
 
+        Tensor operator+(ValueType val) const {
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] + val;
+            }
+            return ret;
+        }
+
         Tensor operator-(const Tensor &rhs) const {
             assert(_shape == rhs.shape());
             Tensor ret(_shape);
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
                 ret._data[i] = _data[i] - rhs._data[i];
+            }
+            return ret;
+        }
+
+        Tensor operator-(ValueType val) const {
+            Tensor ret(_shape);
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                ret._data[i] = _data[i] - val;
             }
             return ret;
         }
@@ -347,6 +364,82 @@ namespace autograd {
                 if (_data[i] != rhs._data[i]) return true;
             }
             return false;
+        }
+
+        Tensor &operator+=(const Tensor &rhs) {
+            assert(_shape == rhs.shape());
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] += rhs._data[i];
+            }
+            return *this;
+        }
+
+        Tensor &operator-=(const Tensor &rhs) {
+            assert(_shape == rhs.shape());
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] -= rhs._data[i];
+            }
+            return *this;
+        }
+
+        Tensor &operator*=(const Tensor &rhs) {
+            assert(_shape == rhs.shape());
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] *= rhs._data[i];
+            }
+            return *this;
+        }
+
+        Tensor &operator/=(const Tensor &rhs) {
+            assert(_shape == rhs.shape());
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] /= rhs._data[i];
+            }
+            return *this;
+        }
+
+        Tensor &operator+=(ValueType val) {
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] += val;
+            }
+            return *this;
+        }
+
+        Tensor &operator-=(ValueType val) {
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] -= val;
+            }
+            return *this;
+        }
+
+        Tensor &operator*=(ValueType val) {
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] *= val;
+            }
+            return *this;
+        }
+
+        Tensor &operator/=(ValueType val) {
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] /= val;
+            }
+            return *this;
+        }
+
+        Tensor &operator^=(ValueType exp) {
+            int numel = _shape.numel();
+            for (int i = 0; i < numel; i++) {
+                _data[i] = std::powf(_data[i], exp);
+            }
+            return *this;
         }
 
         /**
