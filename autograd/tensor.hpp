@@ -47,6 +47,7 @@ namespace autograd {
             rhs._view = true;
         }
 
+        // deep copy assign
         Tensor & operator=(const Tensor &rhs) {
             this->_view = rhs._view;
             if (_view) {
@@ -58,10 +59,11 @@ namespace autograd {
             return *this;
         }
 
+        // move assign
         Tensor & operator=(const Tensor &&rhs) {
             this->_view = rhs._view;
             this->_data = rhs._data;
-            this->_shape = rhs._shape;
+            this->_shape = std::move(rhs._shape);
             rhs._view = true;
             return *this;
         }

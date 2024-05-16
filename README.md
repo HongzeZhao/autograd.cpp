@@ -6,6 +6,7 @@ We build the autograd.cpp with cmake.
 
 ```
 mkdir build
+cd build
 cmake ..
 make
 ```
