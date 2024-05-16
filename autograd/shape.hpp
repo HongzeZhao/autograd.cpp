@@ -10,7 +10,7 @@ public:
     Shape(const std::initializer_list<int>& init_list): std::vector<int>(init_list) {}
 
     /**
-    Returns the total number of elements defined by this shape.
+    * Returns the total number of elements defined by this shape.
     */
     int numel() const {
         int len = 1;
@@ -21,6 +21,7 @@ public:
     }
 
     bool operator==(const Shape &rhs) const {
+        if (dim() != rhs.dim()) return false;
         for (int i = 0; i < dim(); i++) {
             if ((*this)[i] != rhs[i]) return false;
         }
@@ -28,6 +29,7 @@ public:
     }
 
     bool operator!=(const Shape &rhs) const {
+        if (dim() != rhs.dim()) return true;
         for (int i = 0; i < dim(); i++) {
             if ((*this)[i] != rhs[i]) return true;
         }
