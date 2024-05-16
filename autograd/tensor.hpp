@@ -24,16 +24,19 @@ namespace autograd {
     template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
     class Tensor {
     public:
+        // init with given shape
         explicit Tensor(const Shape &shape): _shape(shape), _view(false) {
             this->_data = AllocatorType::alloc(_shape.numel());
         }
 
+        // init with all elements filled by static value
         Tensor(const Shape &shape, ValueType value): _shape(shape), _view(false) {
             int n = _shape.numel();
             this->_data = AllocatorType::alloc(n);
             fill(value);
         }
 
+        // deep copy constructor
         Tensor(const Tensor &rhs): _view(rhs._view) {
             if (_view) {
                 this->_data = rhs._data;
@@ -43,6 +46,7 @@ namespace autograd {
             this->_shape = rhs._shape;
         }
 
+        // move constructor
         Tensor(Tensor &&rhs): _view(rhs._view), _data(rhs._data), _shape(std::move(rhs._shape)) {
             rhs._view = true;
         }
@@ -73,6 +77,7 @@ namespace autograd {
             this->_data = data;
         }
 
+        // init with 1-dimension initializer_list
         Tensor(const std::initializer_list<ValueType>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             this->_data = AllocatorType::alloc(_shape.numel());
@@ -82,6 +87,7 @@ namespace autograd {
             }
         }
 
+        // init with 2-dimension initializer_list
         Tensor(const std::initializer_list<std::vector<ValueType>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
@@ -94,6 +100,7 @@ namespace autograd {
             }
         }
 
+        // init with 3-dimension initializer_list
         Tensor(const std::initializer_list<std::vector<std::vector<ValueType>>>& init_list): _view(false) {
             _shape.push_back(init_list.size());
             if (init_list.size() > 0) {
@@ -107,28 +114,6 @@ namespace autograd {
             for (const auto &il : init_list) {
                 for (const auto &ill : il) {
                     for (ValueType v : ill) (*p++) = v;
-                }
-            }
-        }
-
-        Tensor(const std::initializer_list<std::vector<std::vector<std::vector<ValueType>>>>& init_list): _view(false) {
-            _shape.push_back(init_list.size());
-            if (init_list.size() > 0) {
-                _shape.push_back(init_list.begin()->size());
-                if (init_list.begin()->size() > 0) {
-                    _shape.push_back(init_list.begin()->begin()->size());
-                    if (init_list.begin()->begin()->size() > 0) {
-                        _shape.push_back(init_list.begin()->begin()->begin()->size());
-                    }
-                }
-            }
-            this->_data = AllocatorType::alloc(_shape.numel());
-            ValueType *p = this->_data;
-            for (const auto &il : init_list) {
-                for (const auto &ill : il) {
-                    for (const auto &illl : ill) {
-                        for (ValueType v : illl) (*p++) = v;
-                    }
                 }
             }
         }
