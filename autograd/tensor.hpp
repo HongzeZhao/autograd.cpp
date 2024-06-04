@@ -18,11 +18,15 @@ namespace autograd {
     typedef std::vector<int> AxisPerm;
     typedef std::vector<int> Index;
 
-    static std::random_device _gRandomDevice;
-    static std::default_random_engine _gRandomGenerator(_gRandomDevice());
+    static std::random_device _g_random_device;
+    static std::default_random_engine _g_random_generator(_g_random_device());
 
     template <typename ValueType, typename AllocatorType=Allocator<ValueType>>
     class Tensor {
+    public:
+        typedef std::function<void(ValueType&,ValueType)> ReducerFunc;
+        typedef std::function<ValueType(ValueType)> ValueMapFunc;
+
     public:
         // init with given shape
         explicit Tensor(const Shape &shape): _shape(shape), _view(false) {
@@ -180,7 +184,7 @@ namespace autograd {
             std::normal_distribution<ValueType> distribution(mean, stddev);
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
-                this->_data[i] = distribution(_gRandomGenerator);
+                this->_data[i] = distribution(_g_random_generator);
             }
             return *this;
         }
@@ -192,7 +196,7 @@ namespace autograd {
             std::uniform_real_distribution<ValueType> distribution(low, high);
             int len = _shape.numel();
             for (int i = 0; i < len; i++) {
-                this->_data[i] = distribution(_gRandomGenerator);
+                this->_data[i] = distribution(_g_random_generator);
             }
             return *this;
         }
@@ -212,7 +216,7 @@ namespace autograd {
         /**
         * element accessor with a index vector.
         */
-        ValueType operator()(const std::function<ValueType(ValueType)> &mapper) const {
+        ValueType operator()(const ValueMapFunc &mapper) const {
             Tensor ret(_shape);
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
@@ -224,7 +228,7 @@ namespace autograd {
         /**
         * element accessor with a index vector.
         */
-        ValueType& operator()(const std::function<ValueType(ValueType)> &mapper) {
+        ValueType& operator()(const ValueMapFunc &mapper) {
             int numel = _shape.numel();
             for (int i = 0; i < numel; i++) {
                 _data[i] = mapper(_data[i]);
@@ -775,7 +779,7 @@ namespace autograd {
             }
         }
 
-        Tensor _reduce(Axis axis, bool keep_dims, const std::function<void(ValueType&,ValueType)> &reducer, ValueType initVal) const {
+        Tensor _reduce(Axis axis, bool keep_dims, const ReducerFunc &reducer, ValueType initVal) const {
             Shape shape;
             if (axis.empty()) {
                 for (int d : _shape) shape.push_back(1);
@@ -810,7 +814,7 @@ namespace autograd {
         }
 
         static void _reduce(Tensor &dst, const Tensor &src, Index &indexDst, Index &indexSrc, const Axis &axis,
-                            int d, const std::function<void(ValueType&,ValueType)> &reducer) {
+                            int d, const ReducerFunc &reducer) {
             if (d >= src.shape().dim()) return;
             bool is_last_dim = (d == src.shape().dim() - 1);
             bool is_reduce_dim = axis.empty() || axis.count(d);
